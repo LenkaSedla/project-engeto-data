@@ -78,7 +78,6 @@ FROM (
 		cpc2.name,
 		year(cp2.date_from),
 		concat(cpc2.price_value, cpc2.price_unit)
-	-- ORDER BY cpc2.name, year(cp2.date_from)
 	) c
 LEFT JOIN (
 	SELECT 
@@ -95,7 +94,6 @@ LEFT JOIN (
 		cpc2.name,
 		year(cp2.date_from),
 		concat(cpc2.price_value, cpc2.price_unit)
-	-- ORDER BY cpc2.name, year(cp2.date_from)
 	) d
 ON c.category_code = d.category_code
 AND c.years = d.years + 1
@@ -152,7 +150,8 @@ LEFT JOIN economies_data ed
 ORDER BY years
 ;
 
-SELECT * FROM t_lenka_sedlackova_project_SQL_primary_final;
+SELECT * FROM t_lenka_sedlackova_project_SQL_primary_final
+;
 
 -- 1. otázka
 SELECT
@@ -279,4 +278,41 @@ GROUP BY
 	ed.years,
 	ed.GDP_growth
 ORDER BY ed.years
+;
+----------------------------------------------------------------
+
+CREATE OR REPLACE TABLE t_lenka_sedlackova_project_SQL_secondary_final AS 
+SELECT 
+	e2.country,
+	e2.year,
+	e2.GDP,
+	round((e2.GDP - e3.GDP) / e3.GDP * 100, 2) AS GDP_growth_europe,
+	e2.gini,
+	e2.population
+FROM (
+	SELECT 
+		ee.country,
+		ee.year,
+		ee.GDP,
+		ee.gini,
+		ee.population
+	FROM economies ee
+	WHERE ee.country IN (
+		SELECT country
+		FROM countries 
+		WHERE continent = 'Europe'
+		AND country != 'Czech Republic'
+		) 
+	AND ee.year IN (
+		SELECT DISTINCT years
+		FROM t_lenka_sedlackova_project_SQL_primary_final
+		)
+	) e2
+JOIN economies e3
+	ON e2.country = e3.country
+	AND e2.year = e3.year + 1
+ORDER BY e2.country, e2.year
+;
+
+SELECT * FROM t_lenka_sedlackova_project_SQL_secondary_final
 ;
