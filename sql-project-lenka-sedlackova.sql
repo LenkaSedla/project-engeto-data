@@ -1,3 +1,4 @@
+CREATE OR REPLACE TABLE t_lenka_sedlackova_project_SQL_primary_final AS 
 WITH payroll_average AS (
 SELECT 
 	a.payroll_year,
@@ -132,114 +133,150 @@ LEFT JOIN (
 ON f.`year` = g.`year` + 1
 ORDER BY f.`year`
 ) 
+SELECT 
+	paa.payroll_year AS years,
+	industry_branch,
+	average_payroll,
+	average_payroll_growth,
+	category_code,
+	category_name,
+	category_unit,
+	average_price,
+	average_price_growth,
+	GDP_growth
+FROM payroll_average paa
+LEFT JOIN price_averages pra
+	ON paa.payroll_year = pra.years
+LEFT JOIN economies_data ed	
+	ON paa.payroll_year = ed.`year`
+ORDER BY years
+;
+
+SELECT * FROM t_lenka_sedlackova_project_SQL_primary_final;
+
 -- 1. otázka
 SELECT
 	'industry declining' AS industry,
 	count(DISTINCT aa.industry_branch) AS industry_count
 FROM (
 	SELECT 
-		payroll_year,	
+		years,	
 		industry_branch,
 		average_payroll,
 		average_payroll_growth,
 		if(average_payroll_growth > 0, 1, 0) AS industry_payroll_growth
-	FROM payroll_average
+	FROM t_lenka_sedlackova_project_SQL_primary_final
 	WHERE average_payroll_growth IS NOT NULL 
-	-- ORDER BY industry_branch, payroll_year
  	) aa
 WHERE industry_payroll_growth = 0
 UNION ALL 
 SELECT
 	'all industries' AS industry,
 	count(DISTINCT industry_branch) AS industry_count
-FROM payroll_average
-	-- tady byl kod viz na konci (možná uz nebude potřeba)
+FROM t_lenka_sedlackova_project_SQL_primary_final
+;
+
 -- 2. otázka
-/*	SELECT
-		pa2.years,
-	--	pa2.category_name,
-	--	pa2.category_unit,
-	--	pa2.average_price,
-	--	round(avg(pa.average_payroll), 0) AS avg_payroll_rounded,
-	 	round(avg(pa.average_payroll) / pa2.average_price, 0) AS payroll_div_price
-	FROM payroll_average pa
-	INNER JOIN price_averages pa2
-		ON pa.payroll_year = pa2.years
-	WHERE (lower(pa2.category_name) LIKE lower('chl_b%') OR lower(pa2.category_name) LIKE lower('ml_ko%'))
-		AND pa2.years IN (
-			SELECT min(years) FROM price_averages
-			UNION ALL 
-			SELECT max(years) FROM price_averages
-		)
-	GROUP BY pa.payroll_year,
-		pa2.years,
-		pa2.category_name,
-		pa2.category_unit,
-		pa2.average_price
+SELECT
+	pa2.years,
+	pa2.category_name,
+--	pa2.category_unit,
+--	pa2.average_price,
+--	round(avg(pa.average_payroll), 0) AS avg_payroll_rounded,
+ 	round(avg(pa.average_payroll) / pa2.average_price, 0) AS payroll_div_price
+FROM t_lenka_sedlackova_project_SQL_primary_final pa
+INNER JOIN t_lenka_sedlackova_project_SQL_primary_final pa2
+	ON pa.years = pa2.years
+WHERE (lower(pa2.category_name) LIKE lower('chl_b%') OR lower(pa2.category_name) LIKE lower('ml_ko%'))
+	AND pa2.years IN (
+		SELECT min(years) FROM t_lenka_sedlackova_project_SQL_primary_final
+		WHERE average_price IS NOT NULL 
+		UNION ALL 
+		SELECT max(years) FROM t_lenka_sedlackova_project_SQL_primary_final
+		WHERE average_price IS NOT NULL 
+	)
+GROUP BY 
+	pa2.years,
+	pa2.category_name,
+	pa2.category_unit,
+	pa2.average_price
+;
+
 -- 3. otázka
 SELECT 
-	category_name,
-	sum(average_price_growth) AS overall_price_growth
-FROM price_averages
-WHERE average_price_growth IS NOT NULL
+	cc.category_name,
+	sum(cc.average_price_growth) AS overall_price_growth
+FROM (
+	SELECT DISTINCT 
+		category_name,
+		years,
+		average_price_growth
+	FROM t_lenka_sedlackova_project_SQL_primary_final
+	WHERE average_price_growth IS NOT NULL
+	) cc
 GROUP BY
-	category_name
+	cc.category_name
 ORDER BY overall_price_growth
 LIMIT 1
--- otázka 4
+;
+
+-- 4. otázka
 SELECT
 	pa.years,
 	avg(pa.average_price_growth) - avg(pav.average_payroll_growth) AS growth_diff
-FROM price_averages pa
-LEFT JOIN payroll_average pav
-	ON pa.years = pav.payroll_year
+FROM t_lenka_sedlackova_project_SQL_primary_final pa
+LEFT JOIN t_lenka_sedlackova_project_SQL_primary_final pav
+	ON pa.years = pav.years
 WHERE pa.average_price_growth IS NOT NULL 
 GROUP BY pa.years
 HAVING avg(pa.average_price_growth) - avg(pav.average_payroll_growth) > 10
--- 5 otázka
+;
+
+-- 5. otázka
 SELECT
-	ed.`year`,
+	ed.years,
 	ed.GDP_growth,
 	bb.overall_price_growth,
 	bb.overall_price_growth_next,
 	cc.overall_payroll_growth,
-	cc.overall_payroll_growth_next
+	cc.overall_payroll_growth_next,
 	CASE
 		WHEN ed.GDP_growth > 5 AND (bb.overall_price_growth > 5 OR overall_price_growth_next > 5) THEN 'growth bigger then 5'
 		WHEN ed.GDP_growth > 3 AND (bb.overall_price_growth > 3 OR overall_price_growth_next > 3) THEN 'growth bigger then 3'
 		ELSE 'otherwise'
 	END AS gdp_on_price_growth
-FROM economies_data ed
+FROM t_lenka_sedlackova_project_SQL_primary_final ed
 JOIN (
 	SELECT 
 		pra.years,
 		pra2.years - 1 AS year_next,
 		round(avg(pra.average_price_growth), 2) AS overall_price_growth,
 		round(avg(pra2.average_price_growth), 2) AS overall_price_growth_next
-	FROM price_averages pra
-	JOIN price_averages pra2
+	FROM t_lenka_sedlackova_project_SQL_primary_final pra
+	JOIN t_lenka_sedlackova_project_SQL_primary_final pra2
 		ON pra.years = pra2.years - 1
+	WHERE pra.average_price IS NOT NULL 
 	GROUP BY  pra.years,
-		pra2.years - 1 
+		pra2.years - 1
 	) bb	
-ON ed.`year` = bb.years
+ON ed.years = bb.years
 JOIN (
 	SELECT 
-		paa.payroll_year,
-		paa2.payroll_year - 1 AS payroll_year_next,
+		paa.years,
+		paa2.years - 1 AS payroll_year_next,
 		round(avg(paa.average_payroll_growth), 2) AS overall_payroll_growth,
 		round(avg(paa2.average_payroll_growth), 2) AS overall_payroll_growth_next
-	FROM payroll_average paa
-	JOIN payroll_average paa2
-	ON paa.payroll_year = paa2.payroll_year - 1
-	GROUP BY paa.payroll_year,
-		paa2.payroll_year - 1
+	FROM t_lenka_sedlackova_project_SQL_primary_final paa
+	JOIN t_lenka_sedlackova_project_SQL_primary_final paa2
+		ON paa.years = paa2.years - 1
+	WHERE paa.average_payroll_growth IS NOT NULL 
+	GROUP BY paa.years,
+		paa2.years - 1
 	) cc
-ON ed.`year` = cc.payroll_year
+ON ed.years = cc.years
 -- WHERE average_price_growth IS NOT NULL 
 GROUP BY 
-	ed.`year`,
+	ed.years,
 	ed.GDP_growth
-ORDER BY ed.`year`
-*/
+ORDER BY ed.years
 ;
