@@ -181,8 +181,8 @@ SELECT
 	pa2.category_name,
 --	pa2.category_unit,
 --	pa2.average_price,
---	round(avg(pa.average_payroll), 0) AS avg_payroll_rounded,
- 	round(avg(pa.average_payroll) / pa2.average_price, 0) AS payroll_div_price
+--	round(avg(pa.average_payroll), 1) AS avg_payroll_rounded,
+ 	round(avg(pa.average_payroll) / pa2.average_price, 1) AS payroll_div_price
 FROM t_lenka_sedlackova_project_SQL_primary_final pa
 INNER JOIN t_lenka_sedlackova_project_SQL_primary_final pa2
 	ON pa.years = pa2.years
@@ -197,14 +197,14 @@ WHERE (lower(pa2.category_name) LIKE lower('chl_b%') OR lower(pa2.category_name)
 GROUP BY 
 	pa2.years,
 	pa2.category_name,
-	pa2.category_unit,
-	pa2.average_price
+--	pa2.category_unit,
+--	pa2.average_price
 ;
 
 -- 3. otázka
 SELECT 
 	cc.category_name,
-	sum(cc.average_price_growth) AS overall_price_growth
+	round(sum(cc.average_price_growth), 2) AS overall_price_growth
 FROM (
 	SELECT DISTINCT 
 		category_name,
@@ -222,13 +222,15 @@ LIMIT 1
 -- 4. otázka
 SELECT
 	pa.years,
-	avg(pa.average_price_growth) - avg(pav.average_payroll_growth) AS growth_diff
+--	round(avg(pa.average_price_growth), 2) AS avg_price_growth,
+--	round(avg(pav.average_payroll_growth), 2) AS avg_payroll_growth,
+	round(avg(pa.average_price_growth) - avg(pav.average_payroll_growth), 2) AS growth_diff
 FROM t_lenka_sedlackova_project_SQL_primary_final pa
 LEFT JOIN t_lenka_sedlackova_project_SQL_primary_final pav
 	ON pa.years = pav.years
 WHERE pa.average_price_growth IS NOT NULL 
 GROUP BY pa.years
-HAVING avg(pa.average_price_growth) - avg(pav.average_payroll_growth) > 10
+HAVING round(avg(pa.average_price_growth) - avg(pav.average_payroll_growth), 2) > 10
 ;
 
 -- 5. otázka
@@ -243,7 +245,7 @@ SELECT
 		WHEN ed.GDP_growth > 5 AND (bb.overall_price_growth > 5 OR overall_price_growth_next > 5) THEN 'growth bigger then 5'
 		WHEN ed.GDP_growth > 3 AND (bb.overall_price_growth > 3 OR overall_price_growth_next > 3) THEN 'growth bigger then 3'
 		ELSE 'otherwise'
-	END AS gdp_on_price_growth
+	END AS gdp_on_price_and_payroll_growth
 FROM t_lenka_sedlackova_project_SQL_primary_final ed
 JOIN (
 	SELECT 
